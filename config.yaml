@@ -1,0 +1,57 @@
+# Required
+model: Qwen/Qwen3-4B-Instruct-2507
+
+# vLLM server
+server_base_url: http://localhost:8000
+# Leave empty to use OPENAI_API_KEY env var, fallback "EMPTY"
+api_key: ""
+
+# Output
+results_dir: results
+run_name: ""
+
+# lm-eval-harness (quality metrics)
+tasks: mmlu,hellaswag,arc_challenge
+num_fewshot: 5
+limit: null
+batch_size: auto
+lm_eval_model: local-completions
+lm_eval_model_args: ""
+lm_eval_num_concurrent: 4
+skip_lm_eval: false
+
+# Guardrail probing runtime options
+guardrail_timeout: 60
+guardrail_max_tokens: 256
+guardrail_temperature: 0.0
+
+# Guardrail benchmark sets (public datasets, no hardcoded prompts in code)
+guardrail_benchmarks:
+  - name: harmbench_direct_request
+    preset: harmbench
+    dataset_name: swiss-ai/harmbench
+    dataset_config: DirectRequest
+    split: test
+    max_samples: 320
+    include_context: true
+    exclude_semantic_categories:
+      - copyright
+
+  - name: toxicchat_0124
+    preset: toxicchat
+    dataset_name: lmsys/toxic-chat
+    dataset_config: toxicchat0124
+    split: test
+    max_samples: 1000
+    only_human_annotation: true
+
+  # Example: generic HF dataset format
+  # - name: custom_guardrail_set
+  #   preset: hf_generic
+  #   dataset_name: your-org/your-dataset
+  #   dataset_config: default
+  #   split: test
+  #   prompt_field: prompt
+  #   label_field: label
+  #   harmful_label_values: [1, "harmful", "unsafe"]
+  #   max_samples: 500
