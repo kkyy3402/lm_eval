@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, fields, replace
@@ -195,14 +197,26 @@ def load_eval_config(path: Path) -> EvalConfig:
 
 
 def run_command(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
-    proc = subprocess.run(
-        cmd,
-        cwd=str(cwd) if cwd else None,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(cwd) if cwd else None,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        missing = cmd[0] if cmd else "<empty>"
+        return 127, "", f"Command not found: {missing} ({exc})"
     return proc.returncode, proc.stdout, proc.stderr
+
+
+def resolve_lm_eval_command() -> list[str] | None:
+    if shutil.which("lm_eval"):
+        return ["lm_eval"]
+    if importlib.util.find_spec("lm_eval") is not None:
+        return [sys.executable, "-m", "lm_eval"]
+    return None
 
 
 def discover_lm_eval_json(path_hint: Path) -> Path | None:
@@ -251,8 +265,25 @@ def run_lm_eval(
     batch_size: str,
 ) -> dict[str, Any]:
     out_path = results_dir / "lm_eval_raw"
+    lm_eval_cmd = resolve_lm_eval_command()
+    if lm_eval_cmd is None:
+        return {
+            "ok": False,
+            "exit_code": 127,
+            "command": [],
+            "stdout": "",
+            "stderr": (
+                "lm-eval-harness command not found. Install `lm-eval` in the current "
+                "Python environment (for example: `pip install -r requirements.txt`) "
+                "and ensure PATH/venv are activated."
+            ),
+            "output_path": str(out_path),
+            "json_path": None,
+            "parsed": {},
+        }
+
     cmd = [
-        "lm_eval",
+        *lm_eval_cmd,
         "--model",
         lm_eval_model,
         "--model_args",
